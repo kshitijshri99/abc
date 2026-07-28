@@ -1,299 +1,521 @@
-# SHADOWPIPE
+<div align="center">
 
-**AI-Powered Supply Chain Attack Simulation & Autonomous Defense**
+# 🕳️ SHADOWPIPE
 
-> Operation Shadow Pipeline — a red team / blue team cybersecurity lab demonstrating how a single developer mistake (a credential committed to Git) cascades into a full organizational compromise, and how an LLM-driven autonomous agent detects, contains, and remediates that compromise in **~52 seconds**, against an industry-average breach response time of **197 days** (IBM Ponemon Institute).
+### AI-Powered Supply Chain Attack Simulation & Autonomous Defense
 
-Built as a capstone project for **CDAC's PGCP-ITISS** (Post Graduate Certificate Programme in IT Infrastructure Security & Surveillance).
+*One leaked credential. Five compromised machines. A 17-stage AI response in under a minute.*
 
----
+[![Capstone](https://img.shields.io/badge/CDAC-PGCP--ITISS_Capstone-blue?style=for-the-badge)](#)
+[![Status](https://img.shields.io/badge/Status-Complete-3fb950?style=for-the-badge)](#)
+[![Response Time](https://img.shields.io/badge/AI_Response-~52s-orange?style=for-the-badge)](#)
+[![vs Industry](https://img.shields.io/badge/Industry_Avg-197_days-f85149?style=for-the-badge)](#)
 
-## Table of Contents
+<img alt="stack" src="https://img.shields.io/badge/Node.js-20-3fb950?logo=node.js&logoColor=white&style=flat-square"/>
+<img alt="stack" src="https://img.shields.io/badge/Python-3.12-58a6ff?logo=python&logoColor=white&style=flat-square"/>
+<img alt="stack" src="https://img.shields.io/badge/GitLab_CE-17-orange?logo=gitlab&logoColor=white&style=flat-square"/>
+<img alt="stack" src="https://img.shields.io/badge/Wazuh-4.9-3fb950?logoColor=white&style=flat-square"/>
+<img alt="stack" src="https://img.shields.io/badge/Suricata-7-f85149?style=flat-square"/>
+<img alt="stack" src="https://img.shields.io/badge/LLaMA_3.3_70B-Groq-bc8cff?style=flat-square"/>
+<img alt="stack" src="https://img.shields.io/badge/VMware-Workstation_17-58a6ff?logo=vmware&logoColor=white&style=flat-square"/>
 
-- [What This Project Actually Does](#what-this-project-actually-does)
-- [Why It Exists](#why-it-exists)
-- [Lab Topology](#lab-topology)
-- [The Attack: 10 Stages](#the-attack-10-stages)
-- [The Defense: 17-Stage AI Agent](#the-defense-17-stage-ai-agent)
-- [The Canary Deception Layer](#the-canary-deception-layer)
-- [Live Dashboard Output](#live-dashboard-output)
-- [Running the Demo](#running-the-demo)
-- [Tools & Technology Stack](#tools--technology-stack)
-- [Results & Metrics](#results--metrics)
-- [Framework Coverage](#framework-coverage)
-- [Known Limitations (Intentional)](#known-limitations-intentional)
-- [Repository Layout](#repository-layout)
-- [Safety Notes](#safety-notes)
-- [Possible Extensions](#possible-extensions)
+</div>
 
----
+<br>
 
-## What This Project Actually Does
+> Built as a capstone project for **CDAC's PGCP-ITISS** (Post Graduate Certificate Programme in IT Infrastructure Security & Surveillance). SHADOWPIPE is a fully working 5-VM lab — not a diagram — in which a scripted attacker really compromises a fictional company end-to-end, and an autonomous LLM agent really detects, blocks, patches, and re-deceives it, live, over real API calls, SSH, and iptables.
 
-SHADOWPIPE is not a slide-deck concept — it's a working 5-machine lab in which a scripted attacker actually compromises a fictional company ("**FakeCorp**") end-to-end, and a real AI agent (LLaMA 3.3 70B via Groq) actually detects, blocks, patches, and re-deceives that attacker, with every action executed through live API calls, SSH, iptables, and GitLab's REST API — not simulated log entries.
+<br>
 
-The core story it tells:
+## 📑 Table of Contents
 
-1. A developer commits `credentials.txt` to Git and later deletes it — but git history keeps it forever.
-2. The web server exposes `.git/` over HTTP, so a remote attacker doesn't need any foothold to steal it.
-3. That one exposed folder chains into: GitLab admin token theft → CI/CD pipeline poisoning → DNS exfiltration → a webserver root shell via command injection → a supply-chain-backdoored client → full database exfiltration — all fully automated, in seconds.
-4. An AI SOC agent, triggered the instant the attack finishes, independently triages the incident, contains it, revokes every stolen credential, patches every vulnerability it just watched get exploited, ships a fixed client release, and plants a **honeytoken-based trap** for the attacker's next attempt — before generating an encrypted, framework-mapped incident report.
+| | | |
+|---|---|---|
+| [🎯 What This Actually Does](#-what-this-project-actually-does) | [🗺️ Lab Topology](#️-lab-topology) | [⚔️ The Attack — 10 Stages](#️-the-attack-10-stages) |
+| [🛡️ The Defense — 17 Stages](#️-the-defense-17-stage-ai-agent) | [🪤 Canary Deception](#-the-canary-deception-layer) | [📊 Live Dashboard](#-live-dashboard-output) |
+| [▶️ Running the Demo](#️-running-the-demo) | [🧰 Tech Stack](#-tools--technology-stack) | [📈 Metrics](#-results--metrics) |
+| [🧩 Framework Coverage](#-framework-coverage) | [⚠️ Known Limitations](#️-known-limitations-intentional) | [📂 Repo Layout](#-repository-layout) |
 
-## Why It Exists
-
-The project is built around one thesis: **the attack surface most teams ignore (leaked credentials in version control + unmonitored supply chains) is now more dangerous than the surface they spend the most money defending.** SHADOWPIPE demonstrates that thesis end-to-end rather than describing it, and pairs it with a second thesis: **autonomous, LLM-driven response can close the 197-day industry gap down to under a minute** — while being explicit about where that automation is still naive (see [Known Limitations](#known-limitations-intentional)).
+<br>
 
 ---
 
-## Lab Topology
+## 🎯 What This Project Actually Does
 
-Everything runs on **VMware Workstation Pro 17**, across **5 VMs** on a single **host-only network** (`VMnet2`, `192.168.20.0/24`) with **no route to the internet or the host machine** — attack traffic (reverse shells, DNS exfil, credential theft) never leaves the lab.
+SHADOWPIPE tells one story, twice — once from the attacker's side, once from the defender's:
+
+```mermaid
+flowchart LR
+    A["👨‍💻 Dev commits\ncredentials.txt"] --> B["🗑️ File deleted...\nbut git history\nkeeps it forever"]
+    B --> C["🌐 .git/ exposed\nover HTTP"]
+    C --> D["🔓 Attacker steals\nGitLab token"]
+    D --> E["☣️ Full org\ncompromise\nin <2 minutes"]
+    E --> F["🤖 AI agent\nresponds in\n~52 seconds"]
+
+    style A fill:#161b22,stroke:#58a6ff,color:#c9d1d9
+    style B fill:#161b22,stroke:#d29922,color:#c9d1d9
+    style C fill:#161b22,stroke:#f85149,color:#c9d1d9
+    style D fill:#161b22,stroke:#f85149,color:#c9d1d9
+    style E fill:#161b22,stroke:#f85149,color:#c9d1d9
+    style F fill:#161b22,stroke:#3fb950,color:#c9d1d9
+```
+
+**The thesis, in two parts:**
+
+1. **The attack surface most teams ignore is now the most dangerous one.** Leaked credentials in version control + unmonitored software supply chains beat almost every perimeter control money can buy.
+2. **Autonomous, LLM-driven response can close the 197-day industry gap to under a minute** — while being explicit about exactly where that automation is still naive (see [Known Limitations](#️-known-limitations-intentional)).
+
+<br>
+
+---
+
+## 🗺️ Lab Topology
+
+Five VMs, one **host-only** network (`VMnet2`, `192.168.20.0/24`), **zero route to the internet or host machine**. Attack traffic never leaves the lab.
+
+```mermaid
+graph TB
+    subgraph "🔒 VMnet2 — Host-Only — 192.168.20.0/24"
+    K["🔴 Kali Linux\n192.168.20.50\nRed Team"]
+    W["🌐 WebServer\n192.168.20.10\nBillingPro : Node.js + SQLite3"]
+    G["🦊 GitLab CE\n192.168.20.20\nCode + CI/CD"]
+    S["🛡️ Wazuh SIEM\n192.168.20.30\nSuricata + AI Agent + Dashboard"]
+    C["💻 Client\n192.168.20.40\nVictim Workstation"]
+    end
+
+    K -->|"① exploits"| W
+    K -->|"④ stolen token auths"| G
+    W -->|"⑨ backdoored client"| C
+    S -.->|"⑦ SSH patch"| W
+    S -.->|"④ token revoke"| G
+    S -.->|"⑯ canary deploy"| W
+
+    style K fill:#161b22,stroke:#f85149,stroke-width:2px,color:#f85149
+    style W fill:#161b22,stroke:#58a6ff,stroke-width:2px,color:#58a6ff
+    style G fill:#161b22,stroke:#d29922,stroke-width:2px,color:#d29922
+    style S fill:#161b22,stroke:#3fb950,stroke-width:2px,color:#3fb950
+    style C fill:#161b22,stroke:#bc8cff,stroke-width:2px,color:#bc8cff
+```
+
+<div align="center">
 
 | Machine | IP | OS | Role |
-|---|---|---|---|
-| **Kali** | `192.168.20.50` | Kali Linux 2024 | Red Team — runs `attack.py`, hosts reverse shell (`:4444`) and credential-exfil (`:5555`) listeners |
-| **WebServer** | `192.168.20.10` | Ubuntu Server 24.04 | FakeCorp's public site + **BillingPro** app (Node.js/Express + SQLite3, port 80) |
-| **GitLab** | `192.168.20.20` | Ubuntu Server 24.04 | Self-hosted GitLab CE — code hosting, CI/CD, REST API |
-| **Wazuh** | `192.168.20.30` | Ubuntu Server 24.04 | Blue Team — Suricata IDS, Wazuh SIEM, the AI agent, and the live dashboard |
-| **Client** | `192.168.20.40` | Ubuntu Desktop | Victim workstation that downloads and runs the (initially backdoored) billing client |
+|:---|:---:|:---|:---|
+| 🔴 **Kali** | `192.168.20.50` | Kali Linux 2024 | Red Team — `attack.py`, reverse shell (`:4444`) & credential-exfil (`:5555`) listeners |
+| 🌐 **WebServer** | `192.168.20.10` | Ubuntu Server 24.04 | FakeCorp's site + BillingPro app (port 80) |
+| 🦊 **GitLab** | `192.168.20.20` | Ubuntu Server 24.04 | Self-hosted GitLab CE — hosting + CI/CD + REST API |
+| 🛡️ **Wazuh** | `192.168.20.30` | Ubuntu Server 24.04 | Blue Team — Suricata, Wazuh SIEM, AI agent, dashboard |
+| 💻 **Client** | `192.168.20.40` | Ubuntu Desktop | Victim — downloads & runs the billing client |
 
-**Port map**
+</div>
+
+<details>
+<summary><b>🔌 Port Map</b> (click to expand)</summary>
+<br>
 
 | Port | Protocol | Purpose |
-|---|---|---|
+|:---:|:---:|:---|
 | `80` | HTTP | BillingPro web app / GitLab web + API |
 | `55000` | HTTPS | Wazuh API |
-| `9999` | HTTP | Dashboard status listener — exempted from the attacker's iptables block so status updates keep flowing on the second attack run |
+| `9999` | HTTP | Dashboard status listener — **exempted** from the iptables block so status still flows on the attacker's second attempt |
 | `4444` | TCP | Attacker's reverse shell listener |
 | `5555` | HTTP | Attacker's credential-exfiltration listener |
 
----
+</details>
 
-## The Attack: 10 Stages
-
-Run from Kali as a single script (`attack.py`), fully automated except for two shells the operator interacts with manually.
-
-```
-.git Scan → Repo Dump → Secrets → GitLab Auth → Pipeline
-   → DNS Exfil → Decoy Probe → Web Shell → Supply Chain → Data Exfil
-```
-
-| # | Stage | What Happens |
-|---|---|---|
-| 1 | **`.git` exposure discovery** | `GET /.git/HEAD` returns `200 OK` — Express is serving dotfiles (`dotfiles: 'allow'`) it should never expose. |
-| 2 | **Repository reconstruction** | `git-dumper` rebuilds the *entire* repo — including deleted files — purely from the exposed `.git/objects/`. |
-| 3 | **Secret extraction** | `git log --all -p` greps every historical diff for `GITLAB_TOKEN`, `DB_PASSWORD`, `AWS_KEY` — all of which were "removed" but still live in git's object store. |
-| 4 | **GitLab authentication** | The stolen Personal Access Token authenticates directly to GitLab's REST API (`GET /api/v4/user`) — PATs carry the exact privilege level of the user who created them. |
-| 5 | **CI/CD pipeline poisoning** | `.gitlab-ci.yml` is overwritten via the API. The pipeline now beacons to the attacker on every future push — persistent C2 that survives a simple password reset. |
-| 6 | **DNS exfiltration** | The stolen token is base64-encoded and tunneled out as DNS queries (`{encoded}.attacker.lab`) — a covert channel that many firewalls never inspect. |
-| 7 | **Deception probe** | The attacker checks `/.canary`, `/.honeypot`, `/.decoy` — obvious file-level tripwires. (This is a deliberate decoy for the *real* trap — see [Canary Deception](#the-canary-deception-layer).) |
-| 8 | **Webserver compromise** | SQL injection (`admin' OR '1'='1' --`) bypasses login; command injection in `/api/system/diagnostics` delivers a Python-launched Bash reverse shell — landing as **root**, since BillingPro runs with sudo. |
-| 9 | **Supply chain attack** | `BillingPro_Client.py` is swapped for a backdoored version. The backdoor is a module-level daemon thread (`_svc_heartbeat()`) that opens a reverse shell via `/dev/tcp` **the instant the file is executed** — before any login prompt, before any user interaction. A second listener on `:5555` captures typed credentials live. |
-| 10 | **Data exfiltration** | `UNION`-based SQL injection against `/api/customers` dumps the full `users` table (usernames, password hashes, roles). |
-
-After Stage 10 completes, `attack.py` calls `trigger_agent()` — a single `GET` to the Wazuh dashboard listener (`:9999/trigger`) that hands control to the AI defender.
-
-> **Why "deleting" a secret from Git doesn't work:** `git rm` only removes the file from the *working tree*. The original blob still exists, permanently, in `.git/objects/`. `git revert` doesn't help either — it adds a new commit, it doesn't erase the old one. Only `git filter-repo` / `BFG Repo-Cleaner` actually rewrites history.
+<br>
 
 ---
 
-## The Defense: 17-Stage AI Agent
+## ⚔️ The Attack: 10 Stages
 
-Wazuh flags the attack (Active Response at severity level 15), launches `ai_agent.py`, and from there the agent runs autonomously — no human in the loop.
+Fully automated from a single script (`attack.py`), with two shells the operator interacts with manually.
 
-**Stages 1–3 — Triage**
-1. Pull the latest Wazuh alerts via API
-2. Ask **LLaMA 3.3 70B** (via Groq) to classify the incident: attack type, severity, attacker IP, confidence
-3. Look up the attacker's IP against threat-intel feeds (AbuseIPDB, VirusTotal)
+```mermaid
+flowchart LR
+    S1["1️⃣<br>.git Scan"] --> S2["2️⃣<br>Repo Dump"]
+    S2 --> S3["3️⃣<br>Secrets"]
+    S3 --> S4["4️⃣<br>GitLab Auth"]
+    S4 --> S5["5️⃣<br>Pipeline"]
+    S5 --> S6["6️⃣<br>DNS Exfil"]
+    S6 --> S7["7️⃣<br>Decoy Probe"]
+    S7 --> S8["8️⃣<br>Web Shell"]
+    S8 --> S9["9️⃣<br>Supply Chain"]
+    S9 --> S10["🔟<br>Data Exfil"]
 
-**Stages 4–7 — Containment**
-4. `iptables DROP` the attacker's IP (with an explicit `ACCEPT` exemption for port `9999`, so the dashboard keeps receiving status updates even from a now-blocked attacker on the next run)
-5. Revoke **every** GitLab Personal Access Token (list, then delete each one via API)
-6. Overwrite the poisoned `.gitlab-ci.yml` with a clean pipeline definition
-7. Patch the `.git` exposure over SSH (`rm -rf .git`)
+    style S1 fill:#161b22,stroke:#f85149,color:#f85149
+    style S2 fill:#161b22,stroke:#f85149,color:#f85149
+    style S3 fill:#161b22,stroke:#f85149,color:#f85149
+    style S4 fill:#161b22,stroke:#d29922,color:#d29922
+    style S5 fill:#161b22,stroke:#d29922,color:#d29922
+    style S6 fill:#161b22,stroke:#d29922,color:#d29922
+    style S7 fill:#161b22,stroke:#bc8cff,color:#bc8cff
+    style S8 fill:#161b22,stroke:#f85149,color:#f85149
+    style S9 fill:#161b22,stroke:#f85149,color:#f85149
+    style S10 fill:#161b22,stroke:#bc8cff,color:#bc8cff
+```
 
-**Stages 8–10 — Preservation**
-8. Collect forensic evidence into a timestamped `INC-YYYYMMDD-HHMMSS/` folder
-9. Verify the fix actually worked (`.git` → 404, IP genuinely blocked, pipeline clean)
-10. Generate a **Fernet-encrypted** (AES-128-CBC + HMAC-SHA256) incident report mapped to NIST CSF
+<table>
+<tr><th>#</th><th>Stage</th><th>What Happens</th></tr>
+<tr><td>1</td><td>🔎 <b>.git Discovery</b></td><td><code>GET /.git/HEAD</code> → <code>200 OK</code>. Express is serving dotfiles (<code>dotfiles: 'allow'</code>) it should never expose.</td></tr>
+<tr><td>2</td><td>📦 <b>Repo Reconstruction</b></td><td><code>git-dumper</code> rebuilds the entire repo — including deleted files — purely from exposed <code>.git/objects/</code>.</td></tr>
+<tr><td>3</td><td>🔑 <b>Secret Extraction</b></td><td><code>git log --all -p</code> greps every historical diff for <code>GITLAB_TOKEN</code>, <code>DB_PASSWORD</code>, <code>AWS_KEY</code> — all "removed," none actually gone.</td></tr>
+<tr><td>4</td><td>🦊 <b>GitLab Auth</b></td><td>Stolen PAT authenticates directly to the REST API — tokens carry the exact privilege of their creator.</td></tr>
+<tr><td>5</td><td>☠️ <b>Pipeline Poisoning</b></td><td><code>.gitlab-ci.yml</code> overwritten via API. Beacons to the attacker on every future push — persistent C2.</td></tr>
+<tr><td>6</td><td>📡 <b>DNS Exfiltration</b></td><td>Stolen token base64-tunneled out as DNS queries — a channel many firewalls never inspect.</td></tr>
+<tr><td>7</td><td>🎭 <b>Decoy Probe</b></td><td>Checks <code>/.canary</code>, <code>/.honeypot</code>, <code>/.decoy</code> — obvious bait for the <i>real</i> trap (see below).</td></tr>
+<tr><td>8</td><td>💥 <b>Web Shell</b></td><td>SQLi bypasses login, command injection in <code>/api/system/diagnostics</code> lands a <b>root</b> reverse shell.</td></tr>
+<tr><td>9</td><td>🧬 <b>Supply Chain</b></td><td><code>BillingPro_Client.py</code> swapped for a backdoored build — reverse shell fires <i>instantly</i> on execution, before any login.</td></tr>
+<tr><td>10</td><td>🗃️ <b>Data Exfil</b></td><td><code>UNION</code>-based SQLi dumps the full <code>users</code> table — usernames, hashes, roles.</td></tr>
+</table>
 
-**Stages 11–17 — Remediation & Deception**
-11. Detect, scan, and patch the three real RCE vectors in BillingPro (SQLi, diagnostic command injection, report-generation command injection)
-12. Actively verify each patch (e.g., re-testing the exact payload that broke it originally)
-13. Release a safe **v2.4.2** client build (no embedded backdoor, no credential exfiltration)
-14–15. Roll out the patched client, confirm distribution
-16. Deploy a **canary deception trap** — a decoy `.git` history planted specifically for the attacker's next attempt
-17. Mark the incident `RESOLVED`
+> 💡 **Why "deleting" a secret from Git doesn't work:** `git rm` only clears the *working tree* — the blob still lives in `.git/objects/` forever. `git revert` doesn't help either; it adds a commit, it doesn't erase one. Only `git filter-repo` / `BFG Repo-Cleaner` truly rewrites history.
 
-### The LLM in the loop
+After Stage 10, `attack.py` calls `trigger_agent()` — one `GET` to `:9999/trigger` — handing control to the AI defender.
+
+<br>
+
+---
+
+## 🛡️ The Defense: 17-Stage AI Agent
+
+Wazuh flags the attack at severity 15 (Active Response), launches `ai_agent.py`, and from there it's fully autonomous — no human in the loop.
+
+```mermaid
+flowchart TD
+    subgraph T["🔍 Triage — Stages 1-3"]
+    direction LR
+    T1["Fetch Wazuh\nalerts"] --> T2["LLaMA 3.3 70B\nclassifies"] --> T3["Threat intel\nlookup"]
+    end
+    subgraph CO["🔒 Containment — Stages 4-7"]
+    direction LR
+    C1["Block IP\niptables"] --> C2["Revoke all\nPATs"] --> C3["Clean\npipeline"] --> C4["Patch .git\nexposure"]
+    end
+    subgraph P["📋 Preservation — Stages 8-10"]
+    direction LR
+    P1["Collect\nevidence"] --> P2["Verify\nremediation"] --> P3["Encrypted\nNIST report"]
+    end
+    subgraph R["🔧 Remediation & Deception — Stages 11-17"]
+    direction LR
+    R1["Scan & patch\nBillingPro"] --> R2["Verify\npatches"] --> R3["Release\nv2.4.2"] --> R4["Deploy\ncanary"] --> R5["Mark\nRESOLVED"]
+    end
+
+    T --> CO --> P --> R
+
+    style T fill:#161b22,stroke:#58a6ff,color:#c9d1d9
+    style CO fill:#161b22,stroke:#f85149,color:#c9d1d9
+    style P fill:#161b22,stroke:#d29922,color:#c9d1d9
+    style R fill:#161b22,stroke:#3fb950,color:#c9d1d9
+```
+
+<table>
+<tr><th>Phase</th><th>Stages</th><th>Actions</th></tr>
+<tr><td>🔍 <b>Triage</b></td><td>1–3</td><td>Pull Wazuh alerts → classify with <b>LLaMA 3.3 70B</b> (attack type, severity, attacker IP, confidence) → check threat intel (AbuseIPDB, VirusTotal)</td></tr>
+<tr><td>🔒 <b>Containment</b></td><td>4–7</td><td><code>iptables DROP</code> the attacker (port <code>9999</code> exempt) → revoke <i>every</i> GitLab PAT → clean the poisoned pipeline → patch <code>.git</code> exposure over SSH</td></tr>
+<tr><td>📋 <b>Preservation</b></td><td>8–10</td><td>Collect forensic evidence into <code>INC-YYYYMMDD-HHMMSS/</code> → verify the fix actually worked → generate a <b>Fernet-encrypted</b> report mapped to NIST CSF</td></tr>
+<tr><td>🔧 <b>Remediation & Deception</b></td><td>11–17</td><td>Patch all 3 real RCE vectors → verify each patch → release safe <b>v2.4.2</b> client → deploy the canary trap → mark <code>RESOLVED</code></td></tr>
+</table>
+
+### 🧠 The LLM in the Loop
+
+<div align="center">
 
 | Parameter | Value | Reason |
-|---|---|---|
-| Model | `llama-3.3-70b-versatile` (Groq) | Strong reasoning at free-tier cost, sub-second inference on Groq's LPU hardware |
+|:---|:---:|:---|
+| Model | `llama-3.3-70b-versatile` | Strong reasoning, free-tier, sub-second inference on Groq's LPU |
 | Temperature | `0.1` | Near-deterministic — minimizes hallucinated classifications |
 | Max tokens | `256` | Forces concise, reliably parseable JSON |
-| Input | Top 5 alerts, first 2000 characters | Fits comfortably in context, keeps latency low |
+| Input | Top 5 alerts, first 2000 chars | Fits context, keeps latency low |
 
-**Fail-safe design:** if Groq is unreachable, the agent falls back to a hardcoded worst-case decision (`CRITICAL / Supply Chain / attacker IP known`) and proceeds with full containment anyway. If the model *does* respond but returns malformed JSON, `setdefault('attack_detected', True)` forces the agent to treat it as a real attack. The system is deliberately **biased toward action over inaction** — a real design trade-off, not an oversight (see [Limitations](#known-limitations-intentional) for what that trade-off costs in a false-positive scenario).
+</div>
 
----
+> ⚙️ **Fail-safe design:** if Groq is unreachable, the agent falls back to a hardcoded worst-case decision (`CRITICAL / Supply Chain`) and still runs full containment. Malformed JSON responses default to `attack_detected: True` via `setdefault()`. The system is deliberately **biased toward action over inaction** — a real trade-off, not an oversight (see [Limitations](#️-known-limitations-intentional)).
 
-## The Canary Deception Layer
-
-This is the part of SHADOWPIPE that's easy to undersell in a demo but is arguably the most interesting design decision in the project.
-
-- Stage 7's `/.canary`, `/.honeypot`, `/.decoy` probes are **not** the real trap — they're bait for the trap, deliberately obvious so a sophisticated attacker checks for them and feels reassured when they come back empty.
-- The **actual** trap, deployed at Stage 16, is a `CANARY-{sha256[:24]}` token planted inside the **deleted git object history** of a freshly generated fake `.git` directory — structurally identical to how the original credential leak looked (3 commits, secret committed then "removed").
-- Because the canary lives inside git objects rather than as a file, none of Stage 7's filesystem probes can ever find it.
-- On the attacker's **next** run: they extract `CANARY-...` at Stage 3 believing it's a real token, attempt to authenticate with it at Stage 4, get an `HTTP 401` — and the `canary_trap()` function fires a "you have been caught" banner.
-
-The attacker has to invest effort through 4 full stages of their own reconnaissance before discovering the trap — which is exactly the point: **the deception survives the attacker's own deception-detection routine.**
+<br>
 
 ---
 
-## Live Dashboard Output
+## 🪤 The Canary Deception Layer
 
-A terminal-native dashboard (Python **Rich Live**, 2 Hz refresh) runs alongside the attack/defense, polling two JSON files:
+The most interesting design decision in the project — and easy to undersell in a live demo.
 
-| File | Written by | Contains |
-|---|---|---|
-| `/tmp/attack_status.json` | `attack.py` → HTTP POST to `:9999` | Current red team stage, label, status |
-| `/home/wazuh/evidence/AGENT_STATUS.json` | `ai_agent.py` | Current blue team stage, label, elapsed breach time |
+```mermaid
+sequenceDiagram
+    participant AI as 🤖 AI Agent
+    participant Web as 🌐 WebServer
+    participant Att as 🔴 Attacker (2nd run)
 
-It shows, live:
-- Header: overall state (`ATTACK` / `DEFENSE` / `RESOLVED`) and elapsed time
-- A 10-row red team table and a 17-row blue team table with per-stage status
-- The active evidence folder and the path to the encrypted report
-- A running **breach cost counter** — `$0.29/second` (IBM Ponemon Institute: $4.88M average breach cost ÷ 197 days), which freezes the moment the incident resolves and displays the dollar amount "saved" by responding in ~52 seconds instead of 197 days.
+    AI->>Web: Deploy fake .git history (Stage 16)
+    Note over Web: CANARY-{sha256} planted in deleted git blob
+    Att->>Web: git-dumper + git log --all -p (Stage 3)
+    Web-->>Att: Finds "CANARY-..." believes it's real
+    Att->>Web: Authenticates to GitLab with canary token (Stage 4)
+    Web-->>Att: HTTP 401
+    Note over Att: 🚨 "YOU HAVE BEEN TRAPPED"
+```
+
+- Stage 7's `/.canary`, `/.honeypot`, `/.decoy` probes are **bait for the bait** — deliberately obvious so a sophisticated attacker checks, finds nothing, and feels reassured.
+- The **real** trap, deployed at Stage 16, is a `CANARY-{sha256[:24]}` token hidden inside the **deleted git object history** of a freshly generated fake `.git` directory — structurally identical to the original leak.
+- Because it lives inside git objects rather than as a file, **none** of Stage 7's filesystem probes can ever find it.
+- On the attacker's next run, they extract it at Stage 3, try to authenticate with it at Stage 4, get `401` — trap sprung.
+
+> 🎯 **The point:** the deception survives the attacker's own deception-detection routine. They invest four full stages of effort before discovering they've been caught.
+
+<br>
 
 ---
 
-## Running the Demo
+## 📊 Live Dashboard Output
+
+A terminal-native dashboard (Python **Rich Live**, 2 Hz refresh) polls two JSON files and renders a live view of both sides of the fight:
+
+<div align="center">
+
+| File | Written By | Contains |
+|:---|:---|:---|
+| `/tmp/attack_status.json` | `attack.py` → `POST :9999` | Red team stage, label, status |
+| `/home/wazuh/evidence/AGENT_STATUS.json` | `ai_agent.py` | Blue team stage, label, elapsed breach time |
+
+</div>
+
+```
+┌─ SHADOWPIPE LIVE ────────────────────────────────────────────┐
+│  STATE: DEFENSE                     ELAPSED: 00:00:47         │
+├─────────────────────────────┬──────────────────────────────────┤
+│  🔴 RED TEAM (10 stages)     │  🟢 BLUE TEAM (17 stages)         │
+│  ✅ .git Scan                │  ✅ Fetch Alerts                  │
+│  ✅ Repo Dump                │  ✅ AI Classification              │
+│  ✅ Secrets                  │  ✅ Threat Intel                  │
+│  ✅ GitLab Auth              │  ✅ Block Attacker IP              │
+│  ✅ Pipeline                 │  ✅ Revoke PATs                    │
+│  ✅ DNS Exfil                │  ✅ Clean Pipeline                 │
+│  ✅ Decoy Probe              │  ⏳ Patch .git Exposure            │
+│  ✅ Web Shell                │  ⬜ Collect Evidence               │
+│  ✅ Supply Chain             │  ⬜ Encrypted Report               │
+│  ✅ Data Exfil               │  ⬜ Patch BillingPro                │
+├─────────────────────────────┴──────────────────────────────────┤
+│  💰 BREACH COST: $13.63  (accruing at $0.29/sec)              │
+│  📁 EVIDENCE: /home/wazuh/evidence/INC-20260728-...            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+> The breach-cost counter is built on IBM Ponemon Institute's **$4.88M average breach cost ÷ 197-day average response = $0.29/sec**. It freezes on resolution and shows the dollar amount "saved" by responding in ~52 seconds instead of 197 days.
+
+<br>
+
+---
+
+## ▶️ Running the Demo
 
 ```bash
-# 1. Wazuh VM — resets the entire environment and starts the dashboard
+# 1️⃣ Wazuh VM — reset the environment, start the dashboard
 bash /home/wazuh/reset_all.sh
 
-# 2. Kali VM — kicks off the fully automated 10-stage attack
+# 2️⃣ Kali VM — automated 10-stage attack begins
 python3 /home/kali/attack.py
 
-# 3. Kali VM — interact with Shell 1 (webserver root shell), then Ctrl-D to continue
+# 3️⃣ Kali VM — interact with Shell 1 (webserver root shell), Ctrl-D to continue
 
-# 4. Client VM — download and run the (currently backdoored) client
+# 4️⃣ Client VM — download & run the client
 wget http://192.168.20.10/api/client/download -O bp.py && python3 bp.py
-#    Log in with any credentials — the reverse shell already fired on execution
+#     Log in with anything — the reverse shell already fired on execution
 
-# 5. Kali VM — interact with Shell 2 (client, via supply chain RCE), then Ctrl-D
+# 5️⃣ Kali VM — interact with Shell 2 (client, via supply chain RCE), Ctrl-D
 
-# 6. Attack completes → AI agent triggers automatically on the Wazuh VM
-#    Watch the dashboard: IP blocked → tokens revoked → .git patched →
-#    BillingPro patched → v2.4.2 released → canary deployed → RESOLVED
+# 6️⃣ Attack completes → AI agent triggers automatically on Wazuh
+#     Watch the dashboard: IP blocked → tokens revoked → .git patched →
+#     BillingPro patched → v2.4.2 released → canary deployed → RESOLVED
 
-# 7. Run the attack again to see one of two outcomes:
+# 7️⃣ Run the attack again — two possible outcomes:
 python3 /home/kali/attack.py
-#    - If .git was hard-patched:        Stage 1 fails — "VULNERABILITY PATCHED BY BLUE TEAM"
-#    - If canary .git was restored:     Stage 4 triggers "YOU HAVE BEEN TRAPPED"
 ```
 
-`reset_all.sh` (Wazuh side) and `reset_web.sh` (WebServer side, called over SSH) together handle firewall flushing, GitLab **token rotation** (so the leaked token in git history is valid again on the next run), and recreating the vulnerable 3-commit git history — making the whole demo repeatable indefinitely with no manual cleanup.
+<div align="center">
+
+| If `.git` was hard-patched | If the canary `.git` was restored |
+|:---:|:---:|
+| ❌ **Stage 1 fails**<br>`VULNERABILITY PATCHED BY BLUE TEAM` | 🚨 **Stage 4 triggers the trap**<br>`YOU HAVE BEEN TRAPPED` |
+
+</div>
+
+`reset_all.sh` (Wazuh) + `reset_web.sh` (WebServer, over SSH) together flush firewalls, **rotate the GitLab token**, and recreate the vulnerable 3-commit git history — making the demo repeatable indefinitely with zero manual cleanup.
+
+<br>
 
 ---
 
-## Tools & Technology Stack
+## 🧰 Tools & Technology Stack
+
+<div align="center">
 
 | Category | Tool | Purpose |
-|---|---|---|
-| Virtualization | VMware Workstation Pro 17 | 5-VM host-only lab |
-| Web app | Node.js 20 + Express 4 + SQLite3 | BillingPro Enterprise (the vulnerable target app) |
-| Code hosting | GitLab CE 17 + GitLab Runner | Git + CI/CD, exploited via its own REST API |
-| Network IDS | Suricata 7 | 4 custom rules (DNS exfil, git-dumper signature, reverse shell, SQLi) |
-| SIEM/XDR | Wazuh 4.9 | Alert correlation + Active Response trigger |
-| AI | Groq API — LLaMA 3.3 70B | Autonomous SOC triage and decision-making |
-| Attack tooling | `git-dumper` | Reconstructs full repos from exposed `.git/` |
-| Encryption | Python `cryptography` (Fernet) | AES-128-CBC + HMAC-SHA256 signed incident reports |
-| Threat intel | AbuseIPDB v2, VirusTotal v3 | IP reputation lookups |
-| Dashboard | Python `rich` (Live) | Real-time terminal visualization |
+|:---|:---|:---|
+| 🖥️ Virtualization | VMware Workstation Pro 17 | 5-VM host-only lab |
+| 🌐 Web App | Node.js 20 + Express 4 + SQLite3 | BillingPro Enterprise — the vulnerable target |
+| 🦊 Code Hosting | GitLab CE 17 + GitLab Runner | Git + CI/CD, exploited via its own REST API |
+| 🚨 Network IDS | Suricata 7 | 4 custom rules — DNS exfil, git-dumper, reverse shell, SQLi |
+| 🛡️ SIEM/XDR | Wazuh 4.9 | Alert correlation + Active Response trigger |
+| 🤖 AI | Groq API — LLaMA 3.3 70B | Autonomous SOC triage & decision-making |
+| 🕵️ Attack Tooling | `git-dumper` | Reconstructs full repos from exposed `.git/` |
+| 🔐 Encryption | Python `cryptography` (Fernet) | AES-128-CBC + HMAC-SHA256 signed reports |
+| 🌍 Threat Intel | AbuseIPDB v2, VirusTotal v3 | IP reputation lookups |
+| 📊 Dashboard | Python `rich` (Live) | Real-time terminal visualization |
+
+</div>
+
+<br>
 
 ---
 
-## Results & Metrics
+## 📈 Results & Metrics
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center"><h2>10</h2>Attack Stages</td>
+<td align="center"><h2>17</h2>Defense Stages</td>
+<td align="center"><h2>4</h2>RCE Vectors</td>
+<td align="center"><h2>5</h2>Virtual Machines</td>
+</tr>
+<tr>
+<td align="center"><h2>8</h2>MITRE Techniques</td>
+<td align="center"><h2>12</h2>NIST Categories</td>
+<td align="center"><h2>~52s</h2>AI Response</td>
+<td align="center"><h2>99.9%</h2>Faster than Manual</td>
+</tr>
+</table>
+
+</div>
 
 | Metric | Value |
-|---|---|
-| Attack stages | 10 |
-| Defense stages | 17 |
-| Independent RCE vectors | 4 |
-| Virtual machines | 5 |
-| MITRE ATT&CK techniques mapped | 8 |
-| NIST CSF categories mapped | 12 |
-| Industry average breach response | 197 days |
-| SHADOWPIPE AI response time | ~52 seconds |
-| Speed improvement | 99.9% faster |
-| Breach cost basis | $0.29/sec (IBM Ponemon Institute) |
+|:---|:---:|
+| Industry average breach response | **197 days** |
+| SHADOWPIPE AI response time | **~52 seconds** |
+| Breach cost basis (IBM Ponemon Institute) | **$0.29/sec** |
+| Suricata custom rules | **4** |
+
+<br>
 
 ---
 
-## Framework Coverage
+## 🧩 Framework Coverage
 
-**MITRE ATT&CK (8 techniques)** — T1592.002 (Gather Victim Host Info), T1083 (File & Directory Discovery), T1552.001 (Credentials in Files), T1078 (Valid Accounts), T1195.002 (Supply Chain Compromise), T1059.004 (Unix Shell), T1071.004 (DNS C2), T1041 (Exfiltration Over C2).
+<table>
+<tr>
+<td valign="top" width="34%">
 
-**NIST CSF (12 categories)** — IDENTIFY (2 violated), PROTECT (2 violated / 2 enforced), DETECT (4 enforced), RESPOND (5 enforced), RECOVER (3 enforced).
+**🎯 MITRE ATT&CK** (8 techniques)
+- T1592.002 — Gather Victim Host Info
+- T1083 — File & Directory Discovery
+- T1552.001 — Credentials in Files
+- T1078 — Valid Accounts
+- T1195.002 — Supply Chain Compromise
+- T1059.004 — Unix Shell
+- T1071.004 — DNS C2
+- T1041 — Exfiltration Over C2
 
-**OWASP Top 10** — A03 Injection (SQLi, command, report), A05 Security Misconfiguration, A07 Auth Failures, A08 Software Integrity Failures, A09 Logging Failures, A10 SSRF.
+</td>
+<td valign="top" width="33%">
+
+**🏛️ NIST CSF** (12 categories)
+- 🔴 IDENTIFY — 2 violated
+- 🔴 PROTECT — 2 violated / 2 enforced
+- 🟢 DETECT — 4 enforced
+- 🟢 RESPOND — 5 enforced
+- 🟢 RECOVER — 3 enforced
+
+</td>
+<td valign="top" width="33%">
+
+**🔟 OWASP Top 10**
+- A03 — Injection
+- A05 — Security Misconfiguration
+- A07 — Auth Failures
+- A08 — Software Integrity
+- A09 — Logging Failures
+- A10 — SSRF
+
+</td>
+</tr>
+</table>
+
+<br>
 
 ---
 
-## Known Limitations (Intentional)
+## ⚠️ Known Limitations (Intentional)
 
-These are documented deliberately — SHADOWPIPE is meant to show that remediation is iterative, not a single silver bullet:
+<details>
+<summary><b>🐍 <code>pickle.load()</code> still ships in the "safe" v2.4.2 client</b></summary>
+<br>
+Used for config import/export. Deserializing untrusted pickle data is a known RCE vector (CVSS 9.8 class). Left unfixed on purpose to demonstrate that remediation is iterative — one pass doesn't catch everything.
+</details>
 
-- **`pickle.load()` still ships in the "safe" v2.4.2 client**, used for config import/export. Pickle deserialization of untrusted data is a known RCE vector (CVSS 9.8 class). Left unfixed on purpose to demonstrate that a single remediation pass doesn't catch everything.
-- **Attacker attribution is IP-based only.** A VPN or proxy would defeat the `iptables DROP` containment step — the agent would block the wrong address. Production systems would need payload-pattern correlation, not just source IP.
-- **No human-in-the-loop gate before containment.** The agent's "fail open toward action" design means a false positive still triggers full containment (IP block, token revocation) with no analyst review step.
-- **Sequential, not concurrent, attack/defense.** The agent only starts after all 10 attack stages finish — there's no real-time race condition, though a manual shell left open past Stage 10 could still be killed mid-session if `block_ip()` fires while it's active.
-- **Reset is mandatory between runs.** Without `reset_all.sh`, the previous run's iptables block and rotated credentials persist, and the next attack simply fails at Stage 1 instead of demonstrating anything new.
+<details>
+<summary><b>🌐 Attacker attribution is IP-based only</b></summary>
+<br>
+A VPN or proxy would defeat the <code>iptables DROP</code> step entirely — the agent blocks whatever address it sees, not the real attacker. Production systems need payload-pattern correlation, not just source IP.
+</details>
+
+<details>
+<summary><b>🚦 No human-in-the-loop gate before containment</b></summary>
+<br>
+The agent's "fail open toward action" design means a false positive still triggers full containment — IP block, token revocation — with no analyst review step in between.
+</details>
+
+<details>
+<summary><b>⏱️ Sequential, not concurrent, attack/defense</b></summary>
+<br>
+The agent only starts after all 10 attack stages finish. There's no true race condition, though a manual shell left open past Stage 10 could still be killed mid-session if <code>block_ip()</code> fires while it's active.
+</details>
+
+<details>
+<summary><b>🔄 Reset is mandatory between runs</b></summary>
+<br>
+Without <code>reset_all.sh</code>, the previous run's iptables block and rotated credentials persist, and the next attack simply fails at Stage 1 instead of demonstrating anything new.
+</details>
+
+<br>
 
 ---
 
-## Repository Layout
-
-Scripts are distributed across the 5 VMs based on role rather than living in one flat repo:
+## 📂 Repository Layout
 
 ```
-kali/                      # Red Team (192.168.20.50)
-└── attack.py              # 10-stage automated attack
+kali/                        # 🔴 Red Team (192.168.20.50)
+└── attack.py                # 10-stage automated attack
 
-webserver/                 # Target (192.168.20.10)
-├── server.js               # BillingPro (Node.js/Express + SQLite3)
-├── public/.git/            # Intentionally exposed — root of the attack chain
-└── reset_web.sh            # Restores vulnerable state, replants git history
+webserver/                   # 🌐 Target (192.168.20.10)
+├── server.js                # BillingPro (Node.js/Express + SQLite3)
+├── public/.git/             # Intentionally exposed — root of the attack chain
+└── reset_web.sh             # Restores vulnerable state, replants git history
 
-gitlab/                    # Target (192.168.20.20)
-└── fakecorp-app/           # GitLab CE project + CI/CD pipeline
+gitlab/                      # 🦊 Target (192.168.20.20)
+└── fakecorp-app/            # GitLab CE project + CI/CD pipeline
 
-wazuh/                     # Blue Team (192.168.20.30)
-├── ai_agent.py              # 17-stage autonomous defense
-├── dashboard.py             # Rich Live real-time terminal dashboard
-├── reset_all.sh             # Full environment reset + token rotation
-└── evidence/                # Per-incident forensic evidence + encrypted reports
+wazuh/                       # 🛡️ Blue Team (192.168.20.30)
+├── ai_agent.py               # 17-stage autonomous defense
+├── dashboard.py               # Rich Live real-time terminal dashboard
+├── reset_all.sh               # Full environment reset + token rotation
+└── evidence/                  # Per-incident forensic evidence + encrypted reports
 
-client/                    # Victim (192.168.20.40)
-└── BillingPro_Client.py    # Downloaded from the webserver; backdoored until Stage 9's patch ships
+client/                      # 💻 Victim (192.168.20.40)
+└── BillingPro_Client.py      # Backdoored until Stage 9's patch ships
 ```
+
+<br>
 
 ---
 
-## Safety Notes
+<div align="center">
 
-- The entire lab is isolated on a **host-only virtual network** with no route to the internet or the physical host — none of the attack traffic (reverse shells, DNS tunneling, credential theft) can leave the VM boundary.
-- All credentials, tokens, and IPs used are fictional/lab-only and rotate automatically on every reset.
-- This project is for educational and demonstrative purposes (offensive technique + AI-driven defensive response). Do not point any of the attack tooling at infrastructure you don't own or have explicit authorization to test.
+### 🔒 Safety Notes
 
-## Possible Extensions
+The lab runs entirely on a **host-only virtual network** with no route to the internet or the physical host — none of the attack traffic can leave the VM boundary. All credentials and IPs are fictional and rotate on every reset. **Built for education and demonstration — do not point any of this tooling at systems you don't own or have explicit authorization to test.**
 
-- Replace the hardcoded LLM fallback with a secondary model or a human analyst review queue
-- Add SBOM generation and code signing to catch the supply-chain attack before distribution, not after
-- Swap the IP-based containment for payload-signature-based attribution to survive VPN/proxy evasion
-- Add a human-in-the-loop approval gate before irreversible containment actions (IP block, token revocation)
-- Replace `pickle` with JSON throughout the client for config storage
-- Move the Fernet key out of a flat file and into a proper secrets manager (e.g., HashiCorp Vault)
+<br>
+
+**Possible Extensions:** secondary-model or human review queue · SBOM + code signing · payload-signature attribution · human-in-the-loop containment gate · JSON over pickle · proper secrets management (Vault)
+
+</div>
